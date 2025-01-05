@@ -18,8 +18,8 @@
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/hivemc-stats-bot.git
-    cd hivemc-stats-bot
+    git clone https://github.com/beamkungza1234/Hivestats.git
+    cd Hivestats
     ```
 
 2. Install the required dependencies:
