@@ -1,0 +1,604 @@
+# มีแค่ Skywars กับ Bedwars ที่ใช้ได้ตอนนี้
+
+import requests
+from bs4 import BeautifulSoup
+import nextcord
+from nextcord.ext import commands
+import aiohttp
+import matplotlib.pyplot as plt
+import numpy as np
+from datetime import datetime, timedelta
+
+import math
+
+def xp_to_level(xp):
+    """
+    คำนวณเลเวลจาก XP โดยใช้สมการ XP = 75n(n-1)
+    :param xp: ค่าประสบการณ์สะสมของผู้เล่น
+    :return: เลเวลที่คำนวณได้
+    """
+    # แปลง xp เป็นเลข LV เอาเป็นว่ามันแม่นอยู่
+    a = 75
+    b = -75
+    c = -xp
+
+
+    n = (-b + math.sqrt(b**2 - 4 * a * c)) / (2 * a)
+    return math.floor(n)  
+
+# ดึงข้อมูลเพิ่มเช่น Login Streak และ Quests Completed
+async def fetch_additional_stats(player_name):
+    url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ดึงข้อมูล Login Streak
+        login_streak_tag = soup.find("p", string="Login Streak")
+        login_streak_value = login_streak_tag.find_previous("h1").text.strip() if login_streak_tag else "ไม่พบข้อมูล"
+
+        # ดึงข้อมูล Quests Completed
+        quests_completed_tag = soup.find("p", string="Quests Completed")
+        quests_completed_value = quests_completed_tag.find_previous("h1").text.strip() if quests_completed_tag else "ไม่พบข้อมูล"
+
+        return {
+            "login_streak": login_streak_value,
+            "quests_completed": quests_completed_value
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+
+import aiohttp
+from bs4 import BeautifulSoup
+from datetime import datetime
+
+# Skywars
+async def fetch_skywars_stats(player_name):
+    api_url = f"https://api.playhive.com/v0/game/all/sky/{player_name}"
+    profile_url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        # ดึงข้อมูลจาก API
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url) as api_response:
+                if api_response.status == 200:
+                    api_data = await api_response.json()
+                else:
+                    return {"error": f"ไม่สามารถดึงข้อมูลจาก API ได้ (สถานะ: {api_response.status})"}
+
+            # ดึง HTML ของโปรไฟล์
+            async with session.get(profile_url) as profile_response:
+                profile_response.raise_for_status()
+                html = await profile_response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ดึง URL รูปภาพ
+        img_tag = soup.find("img", class_="object-contain")
+        img_url = f"https://playhive.com{img_tag['src']}" if img_tag else "https://via.placeholder.com/150"
+
+        # ดึงรายละเอียดเพิ่มเติม
+        details_tag = soup.find("p", class_="text-shadow-sm text-shadow-black flex items-center pt-1 text-xl font-medium leading-5 text-white")
+        details_text = details_tag.text.strip() if details_tag else "ไม่ได้ระบุฉายาไว้"
+
+        # ดึงชื่อผู้เล่น
+        player_name_tag = soup.find("h1", class_="text-shadow-lg text-shadow-black text-4xl font-semibold text-white md:text-6xl")
+        player_name_text = player_name_tag.text.strip() if player_name_tag else "ไม่พบชื่อผู้เล่น"
+
+        # เช็คยศพิเศษ
+        special_rank_tag = soup.find("div", class_="text-shadow-sm")
+        if special_rank_tag and "plus" in special_rank_tag.get("class", []):
+            player_name_text += " ✨"  # เพิ่มอิโมจิเมื่อมียศพิเศษ
+
+        # จัดรูปแบบข้อมูลที่ได้จาก API
+        first_played_timestamp = api_data.get("first_played", 0)
+        if first_played_timestamp:
+            # แปลง Unix timestamp เป็น UTC
+            first_played_utc = datetime.utcfromtimestamp(first_played_timestamp)
+            # ปรับเวลาให้เป็น UTC+7 (เวลาของประเทศไทย)
+            first_played_utc7 = first_played_utc + timedelta(hours=7)
+            first_played = first_played_utc7.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            first_played = "ไม่พบข้อมูล"
+
+        kills = api_data.get("kills", 0)
+        deaths = api_data.get("deaths", 0)
+        games_played = api_data.get("played", 0)
+        victories = api_data.get("victories", 0)
+
+        # คำนวณ K/D (Kill/Death ratio)
+        kd_ratio = kills / deaths if deaths > 0 else kills  # ถ้าจำนวนการตายเป็น 0 ให้ค่าเป็นจำนวนการฆ่า (ไม่ตาย)
+
+        # คำนวณเลเวลจาก XP
+        xp = api_data.get("xp", 0)
+        level = xp_to_level(xp)
+
+        # คำนวณจำนวนการฆ่าต่อเกม
+        kills_per_game = kills / games_played if games_played > 0 else 0
+
+        # คำนวณอัตราการชนะ
+        win_rate = (victories / games_played * 100) if games_played > 0 else 0
+
+        # วิเคราะห์สไตล์การเล่น
+        if kd_ratio > 2.0 and kills_per_game > 3.0:
+            play_style = "เน้นการรุก"
+        elif kd_ratio > 1.0 and win_rate > 50:
+            play_style = "เน้นเอาตัวรอด"
+        elif kd_ratio >= 1.5 and kd_ratio <= 2.5 and 40 <= win_rate <= 60:
+            play_style = "สมดุล"
+        elif win_rate > 60:
+            play_style = "เน้นเป้าหมาย"
+        else:
+            play_style = "ไม่มีสไตล์การเล่นที่โดดเด่น"
+
+        stats = {
+            "เกมที่เล่นไปแล้ว": games_played,
+            "เกมที่ชนะ": victories,
+            "อัตราการชนะ": f"{win_rate:.2f}%",
+            "จำนวนฆ่า": kills,
+            "จำนวนการตาย": deaths,
+            "K/D": f"{kd_ratio:.2f}",
+            "จำนวนฆ่าต่อเกม": f"{kills_per_game:.2f}",
+            "จำนวนแร่ที่ขุด": api_data.get("ores_mined", 0),
+            "จำนวน Spellbook ที่ใช้": api_data.get("spells_used", 0),
+            "หีบกลางเกาะที่ถูกทำลาย": api_data.get("mystery_chests_destroyed", 0),
+            "XP": f"{xp} (LV.{level})",
+            "เริ่มเล่นครั้งแรกเมื่อ": first_played,
+            "สไตล์การเล่น": play_style  # เพิ่มข้อมูลสไตล์การเล่น
+        }
+
+        # ส่งข้อมูลกลับ
+        return {
+            "player_name": player_name_text,
+            "avatar_url": img_url,
+            "stats": stats,
+            "details": details_text
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับ API หรือเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+
+
+
+# Bedwars
+async def fetch_bedwars_stats(player_name):
+    api_url = f"https://api.playhive.com/v0/game/all/bed/{player_name}"
+    profile_url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        # ดึงข้อมูลจาก API
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url) as api_response:
+                if api_response.status == 200:
+                    api_data = await api_response.json()
+                else:
+                    return {"error": f"ไม่สามารถดึงข้อมูลจาก API ได้ (สถานะ: {api_response.status})"}
+
+            # ดึง HTML ของโปรไฟล์
+            async with session.get(profile_url) as profile_response:
+                profile_response.raise_for_status()
+                html = await profile_response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ดึง URL รูปภาพ
+        img_tag = soup.find("img", class_="object-contain")
+        img_url = f"https://playhive.com{img_tag['src']}" if img_tag else "https://via.placeholder.com/150"
+
+        # ดึงรายละเอียดเพิ่มเติม
+        details_tag = soup.find("p", class_="text-shadow-sm text-shadow-black flex items-center pt-1 text-xl font-medium leading-5 text-white")
+        details_text = details_tag.text.strip() if details_tag else "ไม่ได้ระบุฉายาไว้"
+
+        # ดึงชื่อผู้เล่น
+        player_name_tag = soup.find("h1", class_="text-shadow-lg text-shadow-black text-4xl font-semibold text-white md:text-6xl")
+        player_name_text = player_name_tag.text.strip() if player_name_tag else "ไม่พบชื่อผู้เล่น"
+
+        # เช็คยศพิเศษ
+        special_rank_tag = soup.find("div", class_="text-shadow-sm")
+        if special_rank_tag and "plus" in special_rank_tag.get("class", []):
+            player_name_text += " ✨"  # เพิ่มอิโมจิเมื่อมียศพิเศษ
+
+        # จัดรูปแบบข้อมูลที่ได้จาก API
+        first_played_timestamp = api_data.get("first_played", 0)
+        if first_played_timestamp:
+            # แปลง Unix timestamp เป็น UTC
+            first_played_utc = datetime.utcfromtimestamp(first_played_timestamp)
+            # ปรับเวลาให้เป็น UTC+7 (เวลาของประเทศไทย)
+            first_played_utc7 = first_played_utc + timedelta(hours=7)
+            first_played = first_played_utc7.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            first_played = "ไม่พบข้อมูล"
+
+        kills = api_data.get("kills", 0)
+        deaths = api_data.get("deaths", 0)
+        games_played = api_data.get("played", 0)
+        victories = api_data.get("victories", 0)
+
+        # คำนวณ K/D (Kill/Death ratio)
+        kd_ratio = kills / deaths if deaths > 0 else kills  # ถ้าจำนวนการตายเป็น 0 ให้ค่าเป็นจำนวนการฆ่า (ไม่ตาย)
+
+        # คำนวณเลเวลจาก XP
+        xp = api_data.get("xp", 0)
+        level = xp_to_level(xp)
+
+        # คำนวณจำนวนการฆ่าต่อเกม
+        kills_per_game = kills / games_played if games_played > 0 else 0
+
+        # คำนวณอัตราการชนะ
+        win_rate = (victories / games_played * 100) if games_played > 0 else 0
+
+        # วิเคราะห์สไตล์การเล่น
+        if kd_ratio > 2.0 and kills_per_game > 3.0:
+            play_style = "เน้นการรุก"
+        elif kd_ratio > 1.0 and win_rate > 50:
+            play_style = "เน้นเอาตัวรอด"
+        elif kd_ratio >= 1.5 and kd_ratio <= 2.5 and 40 <= win_rate <= 60:
+            play_style = "สมดุล"
+        elif win_rate > 60:
+            play_style = "เน้นเป้าหมาย"
+        else:
+            play_style = "ไม่มีสไตล์ความถนัดที่โดดเด่น"
+
+        stats = {
+            "เกมที่เล่นไปแล้ว": games_played,
+            "เกมที่ชนะ": victories,
+            "อัตราการชนะ": f"{win_rate:.2f}%",
+            "จำนวนฆ่า": kills,
+            "จำนวนการตาย": deaths,
+            "K/D": f"{kd_ratio:.2f}",
+            "จำนวนฆ่าต่อเกม": f"{kills_per_game:.2f}",
+            "เตียงที่ทำลาย": api_data.get("beds_destroyed", 0),
+            "Final Kills": api_data.get("final_kills", 0),
+            "XP": f"{xp} (LV.{level})",
+            "เริ่มเล่นครั้งแรกเมื่อ": first_played,
+            "ความถนัดในการเล่น": play_style  # เพิ่มข้อมูลสไตล์การเล่น
+        }
+
+        # ส่งข้อมูลกลับ
+        return {
+            "player_name": player_name_text,
+            "avatar_url": img_url,
+            "stats": stats,
+            "details": details_text
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับ API หรือเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+    
+#MurderMystety
+async def fetch_murder_stats(player_name):
+    url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        # ดึง HTML ของโปรไฟล์
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ตรวจสอบว่าเป็นข้อมูลเกี่ยวกับ Murder หรือไม่
+        skywars_section = soup.find("h2", text="Murder Mystery")
+        if not skywars_section:
+            return {"error": "ไม่พบข้อมูล Murder Mystery"}
+
+        # ค้นหาทั้งหมดที่อยู่ในกลุ่มของสถิติ
+        stat_elements = skywars_section.find_next("div", class_="flex-wrap").find_all("div", class_="flex-1 rounded-md bg-[#722b9113] p-2")
+
+        # ฟังก์ชันช่วยในการจับคู่ตัวเลขกับหัวข้อ
+        def get_stat_value(stat_elements, stat_name):
+            for stat in stat_elements:
+                value = stat.find("h3").text.strip()
+                title = stat.find("p").text.strip()
+                if stat_name in title:
+                    return value
+            return f"ไม่พบข้อมูล {stat_name}"
+
+        # ดึงข้อมูลสถิติที่ต้องการ
+        stats = {}
+        stats["เกมที่ชนะ"] = get_stat_value(stat_elements, "Games Won")
+        stats["เกมที่เล่นไปแล้ว"] = get_stat_value(stat_elements, "Games Played")
+        stats["อัตราการชนะ"] = get_stat_value(stat_elements, "Win Percentage")
+
+        # ดึง URL รูปภาพ
+        img_tag = soup.find("img", class_="object-contain")
+        img_url = f"https://playhive.com{img_tag['src']}" if img_tag else "https://via.placeholder.com/150"
+
+        # ดึงรายละเอียดเพิ่มเติม
+        details_tag = soup.find("p", class_="text-shadow-sm text-shadow-black flex items-center pt-1 text-xl font-medium leading-5 text-white")
+        details_text = details_tag.text.strip() if details_tag else "ไม่ได้ระบุฉายาไว้"
+
+        # ดึงชื่อผู้เล่น
+        player_name_tag = soup.find("h1", class_="text-shadow-lg text-shadow-black text-4xl font-semibold text-white md:text-6xl")
+        player_name_text = player_name_tag.text.strip() if player_name_tag else "ไม่พบชื่อผู้เล่น"
+
+        special_rank_tag = soup.find("div", class_="text-shadow-sm")
+        if special_rank_tag and "plus" in special_rank_tag.get("class", []):
+            player_name_text += " ✨"  # เพิ่มอิโมจิเมื่อมียศพิเศษ
+
+        # ส่งข้อมูลกลับ
+        return {
+            "player_name": player_name_text,
+            "avatar_url": img_url,
+            "stats": stats,
+            "details": details_text
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+    
+#Deathrun
+async def fetch_deathrun_stats(player_name):
+    url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        # ดึง HTML ของโปรไฟล์
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ตรวจสอบว่าเป็นข้อมูลเกี่ยวกับ Skywars หรือไม่
+        skywars_section = soup.find("h2", text="DeathRun")
+        if not skywars_section:
+            return {"error": "ไม่พบข้อมูล DeathRun"}
+
+        # ค้นหาทั้งหมดที่อยู่ในกลุ่มของสถิติ
+        stat_elements = skywars_section.find_next("div", class_="flex-wrap").find_all("div", class_="flex-1 rounded-md bg-[#722b9113] p-2")
+
+        # ฟังก์ชันช่วยในการจับคู่ตัวเลขกับหัวข้อ
+        def get_stat_value(stat_elements, stat_name):
+            for stat in stat_elements:
+                value = stat.find("h3").text.strip()
+                title = stat.find("p").text.strip()
+                if stat_name in title:
+                    return value
+            return f"ไม่พบข้อมูล {stat_name}"
+
+        # ดึงข้อมูลสถิติที่ต้องการ
+        stats = {}
+        stats["เกมที่ชนะ"] = get_stat_value(stat_elements, "Games Won")
+        stats["เกมที่เล่นไปแล้ว"] = get_stat_value(stat_elements, "Games Played")
+        stats["อัตราการชนะ"] = get_stat_value(stat_elements, "Win Percentage")
+
+        # ดึง URL รูปภาพ
+        img_tag = soup.find("img", class_="object-contain")
+        img_url = f"https://playhive.com{img_tag['src']}" if img_tag else "https://via.placeholder.com/150"
+
+        # ดึงรายละเอียดเพิ่มเติม
+        details_tag = soup.find("p", class_="text-shadow-sm text-shadow-black flex items-center pt-1 text-xl font-medium leading-5 text-white")
+        details_text = details_tag.text.strip() if details_tag else "ไม่ได้ระบุฉายาไว้"
+
+        # ดึงชื่อผู้เล่น
+        player_name_tag = soup.find("h1", class_="text-shadow-lg text-shadow-black text-4xl font-semibold text-white md:text-6xl")
+        player_name_text = player_name_tag.text.strip() if player_name_tag else "ไม่พบชื่อผู้เล่น"
+
+        special_rank_tag = soup.find("div", class_="text-shadow-sm")
+        if special_rank_tag and "plus" in special_rank_tag.get("class", []):
+            player_name_text += " ✨"  # เพิ่มอิโมจิเมื่อมียศพิเศษ
+
+        # ส่งข้อมูลกลับ
+        return {
+            "player_name": player_name_text,
+            "avatar_url": img_url,
+            "stats": stats,
+            "details": details_text
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+
+#SuvivalGames
+async def fetch_survivalgame_stats(player_name):
+    url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        # ดึง HTML ของโปรไฟล์
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ตรวจสอบว่าเป็นข้อมูลเกี่ยวกับ Skywars หรือไม่
+        skywars_section = soup.find("h2", text="Survival Games")
+        if not skywars_section:
+            return {"error": "ไม่พบข้อมูล Survival Games"}
+
+        # ค้นหาทั้งหมดที่อยู่ในกลุ่มของสถิติ
+        stat_elements = skywars_section.find_next("div", class_="flex-wrap").find_all("div", class_="flex-1 rounded-md bg-[#722b9113] p-2")
+
+        # ฟังก์ชันช่วยในการจับคู่ตัวเลขกับหัวข้อ
+        def get_stat_value(stat_elements, stat_name):
+            for stat in stat_elements:
+                value = stat.find("h3").text.strip()
+                title = stat.find("p").text.strip()
+                if stat_name in title:
+                    return value
+            return f"ไม่พบข้อมูล {stat_name}"
+
+        # ดึงข้อมูลสถิติที่ต้องการ
+        stats = {}
+        stats["เกมที่ชนะ"] = get_stat_value(stat_elements, "Games Won")
+        stats["เกมที่เล่นไปแล้ว"] = get_stat_value(stat_elements, "Games Played")
+        stats["อัตราการชนะ"] = get_stat_value(stat_elements, "Win Percentage")
+
+        # ดึง URL รูปภาพ
+        img_tag = soup.find("img", class_="object-contain")
+        img_url = f"https://playhive.com{img_tag['src']}" if img_tag else "https://via.placeholder.com/150"
+
+        # ดึงรายละเอียดเพิ่มเติม
+        details_tag = soup.find("p", class_="text-shadow-sm text-shadow-black flex items-center pt-1 text-xl font-medium leading-5 text-white")
+        details_text = details_tag.text.strip() if details_tag else "ไม่ได้ระบุฉายาไว้"
+
+        # ดึงชื่อผู้เล่น
+        player_name_tag = soup.find("h1", class_="text-shadow-lg text-shadow-black text-4xl font-semibold text-white md:text-6xl")
+        player_name_text = player_name_tag.text.strip() if player_name_tag else "ไม่พบชื่อผู้เล่น"
+
+        special_rank_tag = soup.find("div", class_="text-shadow-sm")
+        if special_rank_tag and "plus" in special_rank_tag.get("class", []):
+            player_name_text += " ✨"  # เพิ่มอิโมจิเมื่อมียศพิเศษ
+
+        # ส่งข้อมูลกลับ
+        return {
+            "player_name": player_name_text,
+            "avatar_url": img_url,
+            "stats": stats,
+            "details": details_text
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+
+#CaptureTheFlag
+async def fetch_capturetheflag_stats(player_name):
+    url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        # ดึง HTML ของโปรไฟล์
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ตรวจสอบว่าเป็นข้อมูลเกี่ยวกับ Skywars หรือไม่
+        skywars_section = soup.find("h2", text="Capture the Flag")
+        if not skywars_section:
+            return {"error": "ไม่พบข้อมูล CaptureFlag"}
+
+        # ค้นหาทั้งหมดที่อยู่ในกลุ่มของสถิติ
+        stat_elements = skywars_section.find_next("div", class_="flex-wrap").find_all("div", class_="flex-1 rounded-md bg-[#722b9113] p-2")
+
+        # ฟังก์ชันช่วยในการจับคู่ตัวเลขกับหัวข้อ
+        def get_stat_value(stat_elements, stat_name):
+            for stat in stat_elements:
+                value = stat.find("h3").text.strip()
+                title = stat.find("p").text.strip()
+                if stat_name in title:
+                    return value
+            return f"ไม่พบข้อมูล {stat_name}"
+
+        # ดึงข้อมูลสถิติที่ต้องการ
+        stats = {}
+        stats["เกมที่ชนะ"] = get_stat_value(stat_elements, "Games Won")
+        stats["เกมที่เล่นไปแล้ว"] = get_stat_value(stat_elements, "Games Played")
+        stats["อัตราการชนะ"] = get_stat_value(stat_elements, "Win Percentage")
+
+        # ดึง URL รูปภาพ
+        img_tag = soup.find("img", class_="object-contain")
+        img_url = f"https://playhive.com{img_tag['src']}" if img_tag else "https://via.placeholder.com/150"
+
+        # ดึงรายละเอียดเพิ่มเติม
+        details_tag = soup.find("p", class_="text-shadow-sm text-shadow-black flex items-center pt-1 text-xl font-medium leading-5 text-white")
+        details_text = details_tag.text.strip() if details_tag else "ไม่ได้ระบุฉายาไว้"
+
+        # ดึงชื่อผู้เล่น
+        player_name_tag = soup.find("h1", class_="text-shadow-lg text-shadow-black text-4xl font-semibold text-white md:text-6xl")
+        player_name_text = player_name_tag.text.strip() if player_name_tag else "ไม่พบชื่อผู้เล่น"
+
+        special_rank_tag = soup.find("div", class_="text-shadow-sm")
+        if special_rank_tag and "plus" in special_rank_tag.get("class", []):
+            player_name_text += " ✨"  # เพิ่มอิโมจิเมื่อมียศพิเศษ
+
+        # ส่งข้อมูลกลับ
+        return {
+            "player_name": player_name_text,
+            "avatar_url": img_url,
+            "stats": stats,
+            "details": details_text
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+    
+#BuildBattle
+async def fetch_justbuild_stats(player_name):
+    url = f"https://hivebe.link/p/{player_name}"
+
+    try:
+        # ดึง HTML ของโปรไฟล์
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                html = await response.text()
+
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # ตรวจสอบว่าเป็นข้อมูลเกี่ยวกับ Skywars หรือไม่
+        skywars_section = soup.find("h2", text="Just Build")
+        if not skywars_section:
+            return {"error": "ไม่พบข้อมูล Build Battle"}
+
+        # ค้นหาทั้งหมดที่อยู่ในกลุ่มของสถิติ
+        stat_elements = skywars_section.find_next("div", class_="flex-wrap").find_all("div", class_="flex-1 rounded-md bg-[#722b9113] p-2")
+
+        # ฟังก์ชันช่วยในการจับคู่ตัวเลขกับหัวข้อ
+        def get_stat_value(stat_elements, stat_name):
+            for stat in stat_elements:
+                value = stat.find("h3").text.strip()
+                title = stat.find("p").text.strip()
+                if stat_name in title:
+                    return value
+            return f"ไม่พบข้อมูล {stat_name}"
+
+        # ดึงข้อมูลสถิติที่ต้องการ
+        stats = {}
+        stats["เกมที่ชนะ"] = get_stat_value(stat_elements, "Games Won")
+        stats["เกมที่เล่นไปแล้ว"] = get_stat_value(stat_elements, "Games Played")
+        stats["อัตราการชนะ"] = get_stat_value(stat_elements, "Win Percentage")
+
+        # ดึง URL รูปภาพ
+        img_tag = soup.find("img", class_="object-contain")
+        img_url = f"https://playhive.com{img_tag['src']}" if img_tag else "https://via.placeholder.com/150"
+
+        # ดึงรายละเอียดเพิ่มเติม
+        details_tag = soup.find("p", class_="text-shadow-sm text-shadow-black flex items-center pt-1 text-xl font-medium leading-5 text-white")
+        details_text = details_tag.text.strip() if details_tag else "ไม่ได้ระบุฉายาไว้"
+
+        # ดึงชื่อผู้เล่น
+        player_name_tag = soup.find("h1", class_="text-shadow-lg text-shadow-black text-4xl font-semibold text-white md:text-6xl")
+        player_name_text = player_name_tag.text.strip() if player_name_tag else "ไม่พบชื่อผู้เล่น"
+
+        special_rank_tag = soup.find("div", class_="text-shadow-sm")
+        if special_rank_tag and "plus" in special_rank_tag.get("class", []):
+            player_name_text += " ✨"  # เพิ่มอิโมจิเมื่อมียศพิเศษ
+
+        # ส่งข้อมูลกลับ
+        return {
+            "player_name": player_name_text,
+            "avatar_url": img_url,
+            "stats": stats,
+            "details": details_text
+        }
+
+    except aiohttp.ClientError as e:
+        return {"error": f"ไม่สามารถเชื่อมต่อกับเว็บไซต์ได้: {e}"}
+    except Exception as e:
+        return {"error": f"เกิดข้อผิดพลาด: {e}"}
+    
