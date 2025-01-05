@@ -1,4 +1,5 @@
 # มีแค่ Skywars กับ Bedwars ที่ใช้ได้ตอนนี้
+# Only Skywars and Bedwars are available for now
 
 import requests
 from bs4 import BeautifulSoup
@@ -28,7 +29,7 @@ def xp_to_level(xp):
 
 # ดึงข้อมูลเพิ่มเช่น Login Streak และ Quests Completed
 async def fetch_additional_stats(player_name):
-    url = f"https://hivebe.link/p/{player_name}"
+    url = f"https://hivebe.link/p/{player_name}" 
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -63,7 +64,7 @@ from datetime import datetime
 # Skywars
 async def fetch_skywars_stats(player_name):
     api_url = f"https://api.playhive.com/v0/game/all/sky/{player_name}"
-    profile_url = f"https://hivebe.link/p/{player_name}"
+    profile_url = f"https://hivebe.link/p/{player_name}" # URL นี้ใช้ดึง pfp และฉายา
 
     try:
         # ดึงข้อมูลจาก API
@@ -173,7 +174,7 @@ async def fetch_skywars_stats(player_name):
 # Bedwars
 async def fetch_bedwars_stats(player_name):
     api_url = f"https://api.playhive.com/v0/game/all/bed/{player_name}"
-    profile_url = f"https://hivebe.link/p/{player_name}"
+    profile_url = f"https://hivebe.link/p/{player_name}" # URL นี้ใช้ดึง pfp และฉายา
 
     try:
         # ดึงข้อมูลจาก API
