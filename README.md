@@ -2,7 +2,13 @@
 
 บอท Discord ที่ดึงและแสดงสถิติผู้เล่นจาก HiveMC สำหรับเกมต่างๆ เช่น Skywars, Bedwars, Murder Mystery, Deathrun, Survival Games, Capture The Flag, และ Build Battle
 
+## Note
+- Repo นี้อยู่ในระหว่างการพัฒนา เฉพาะแค่ข้อมูลในส่วนของ Skywars และ Bedwars ที่ใช้ได้ตอนนี้
+- จะมีการเพิ่มคุณสมบัติสำหรับการเปรียบเทียบระหว่างผู้เล่น 2 คน โดยอ้างอิงข้อมูลจาก API
+  
 ## คุณสมบัติ
+
+![alt text](https://github.com/beamkungza1234/Hivestats/blob/main/Hivestats.png?raw=true)
 
 - ดึงสถิติผู้เล่นสำหรับเกมต่างๆ บน HiveMC
 - แสดงสถิติเพิ่มเติม เช่น login streak และ quests completed
