@@ -1,6 +1,3 @@
-# มีแค่ Skywars กับ Bedwars ที่ใช้ได้ตอนนี้
-# Only Skywars and Bedwars are available for now
-
 import requests
 from bs4 import BeautifulSoup
 import nextcord
