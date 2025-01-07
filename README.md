@@ -16,30 +16,30 @@
 
 ## การติดตั้ง
 
-1. Clone the repository:
+1. คัดลอก Repo มา:
     ```sh
     git clone https://github.com/beamkungza1234/Hivestats.git
     cd Hivestats
     ```
 
-2. Install the required dependencies:
+2. ติดตั้งไลบารี่ที่จำเป็น:
     ```sh
     pip install -r requirements.txt
     ```
 
-3. Create a [.env](http://_vscodecontentref_/0) file in the root directory and add your Discord bot token:
+3. สร้าง [.env](http://_vscodecontentref_/0) และใส่โทเค็นบอทของคุณลงไป:
     ```env
     DISCORD_BOT_SECRET=your_discord_bot_token
     ```
 
 ## การใช้งาน
 
-1. Run the bot:
+1. เปิดใช้งาน:
     ```sh
     python main.py
     ```
 
-2. Use the `/hivestats` command in your Discord server to fetch player statistics:
+2. ใช้คำสั่ง `/hivestats` ในดิสคอร์ดของคุณเพื่อดึงข้อมูลผู้เล่นมา:
     ```sh
     /hivestats game:<game_name> player_name:<player_name>
     ```
@@ -69,9 +69,6 @@
 - [fetch_capturetheflag_stats(player_name)](http://_vscodecontentref_/15): ดึงสถิติ Capture The Flag
 - [fetch_justbuild_stats(player_name)](http://_vscodecontentref_/16): ดึงสถิติ Build Battle
 
-## ใบอนุญาต
-
-โปรเจกต์นี้ได้รับอนุญาตภายใต้ MIT License ดูไฟล์ LICENSE สำหรับรายละเอียด
 
 ## การมีส่วนร่วม
 

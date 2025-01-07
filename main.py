@@ -22,6 +22,12 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+@bot.event
+async def on_ready():
+  await bot.change_presence(status=nextcord.Status.online, activity=nextcord.Game('!help'))
+  print("\n[ The bot is ready to use ]\nCreate By BKZ - Hivestats")
+  print("Powered By Nextcord", nextcord.__version__)
+  print("-------------------------")
 
 @bot.slash_command(description="ดึงข้อมูลผู้เล่นจาก HiveMC")
 async def hivestats(
