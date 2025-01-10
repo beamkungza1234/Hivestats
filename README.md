@@ -63,18 +63,6 @@
 
 - [hivestats(interaction, game, player_name)](http://_vscodecontentref_/6): จัดการคำสั่ง `/hivestats` เพื่อดึงและแสดงสถิติผู้เล่น
 
-### [getstats.py](http://_vscodecontentref_/7)
-
-- [xp_to_level(xp)](http://_vscodecontentref_/8): แปลง XP เป็นเลเวลผู้เล่น
-- [fetch_additional_stats(player_name)](http://_vscodecontentref_/9): ดึงสถิติเพิ่มเติม เช่น login streak และ quests completed
-- [fetch_skywars_stats(player_name)](http://_vscodecontentref_/10): ดึงสถิติ Skywars
-- [fetch_bedwars_stats(player_name)](http://_vscodecontentref_/11): ดึงสถิติ Bedwars
-- [fetch_murder_stats(player_name)](http://_vscodecontentref_/12): ดึงสถิติ Murder Mystery
-- [fetch_deathrun_stats(player_name)](http://_vscodecontentref_/13): ดึงสถิติ Deathrun
-- [fetch_survivalgame_stats(player_name)](http://_vscodecontentref_/14): ดึงสถิติ Survival Games
-- [fetch_capturetheflag_stats(player_name)](http://_vscodecontentref_/15): ดึงสถิติ Capture The Flag
-- [fetch_justbuild_stats(player_name)](http://_vscodecontentref_/16): ดึงสถิติ Build Battle
-
 
 ## การมีส่วนร่วม
 
